@@ -88,8 +88,21 @@ export async function generatePDF(elementId) {
   }
 }
 
+// Get bullet character
+function getBulletChar(style) {
+  const bullets = { disc: '•', dash: '–', arrow: '›', square: '▪' }
+  return bullets[style] || '•'
+}
+
 // Alternative: Generate PDF from resume data directly (more reliable)
-export function generatePDFFromData(resumeData, colorScheme, font) {
+export function generatePDFFromData(resumeData, colorScheme, font, settings = {}) {
+  const bulletChar = getBulletChar(settings.bulletStyle)
+  const isHidden = (section) => (settings.hiddenSections || []).includes(section)
+  const fontMultiplier = settings.fontSize === 'small' ? 0.9 : settings.fontSize === 'large' ? 1.1 : 1
+  
+  // Margin sizes
+  const marginSizes = { narrow: 40, normal: 50, wide: 65 }
+  const margin = marginSizes[settings.margins] || 50
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'pt',
@@ -98,7 +111,6 @@ export function generatePDFFromData(resumeData, colorScheme, font) {
   
   const pageWidth = 612 // Letter width in points
   const pageHeight = 792 // Letter height in points
-  const margin = 50
   const contentWidth = pageWidth - (margin * 2)
   let y = margin
   
@@ -171,30 +183,30 @@ export function generatePDFFromData(resumeData, colorScheme, font) {
   }
   
   // Summary
-  if (summary) {
+  if (summary && !isHidden('summary')) {
     addSectionHeader('Professional Summary')
-    addText(summary, 10)
+    addText(summary, 10 * fontMultiplier)
   }
   
   // Experience
-  if (experience && experience.length > 0) {
+  if (experience && experience.length > 0 && !isHidden('experience')) {
     addSectionHeader('Professional Experience')
     experience.forEach(exp => {
       // Title and dates on same line
-      pdf.setFontSize(11)
+      pdf.setFontSize(11 * fontMultiplier)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor('#1f2937')
       pdf.text(exp.title || 'Position', margin, y)
       
       const dateText = `${exp.startDate || ''} - ${exp.endDate || 'Present'}`
-      pdf.setFontSize(9)
+      pdf.setFontSize(9 * fontMultiplier)
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor('#6b7280')
       pdf.text(dateText, pageWidth - margin, y, { align: 'right' })
       y += 14
       
       // Company
-      pdf.setFontSize(10)
+      pdf.setFontSize(10 * fontMultiplier)
       pdf.setTextColor(colorScheme?.primary || '#1e3a5f')
       pdf.text(exp.company || 'Company', margin, y)
       y += 14
@@ -203,10 +215,10 @@ export function generatePDFFromData(resumeData, colorScheme, font) {
       if (exp.achievements && exp.achievements.length > 0) {
         exp.achievements.forEach(achievement => {
           if (achievement) {
-            pdf.setFontSize(9)
+            pdf.setFontSize(9 * fontMultiplier)
             pdf.setTextColor('#374151')
             pdf.setFont('helvetica', 'normal')
-            const bulletText = `• ${achievement}`
+            const bulletText = `${bulletChar} ${achievement}`
             const lines = pdf.splitTextToSize(bulletText, contentWidth - 10)
             lines.forEach(line => {
               if (y > pageHeight - margin) {
@@ -224,21 +236,21 @@ export function generatePDFFromData(resumeData, colorScheme, font) {
   }
   
   // Projects
-  if (projects && projects.length > 0) {
+  if (projects && projects.length > 0 && !isHidden('projects')) {
     addSectionHeader('Projects')
     projects.forEach(project => {
-      pdf.setFontSize(11)
+      pdf.setFontSize(11 * fontMultiplier)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor('#1f2937')
       pdf.text(project.name || 'Project', margin, y)
       y += 14
       
       if (project.description) {
-        addText(project.description, 9)
+        addText(project.description, 9 * fontMultiplier)
       }
       
       if (project.technologies) {
-        pdf.setFontSize(8)
+        pdf.setFontSize(8 * fontMultiplier)
         pdf.setTextColor('#6b7280')
         pdf.text(`Technologies: ${project.technologies}`, margin, y)
         y += 12
@@ -248,49 +260,49 @@ export function generatePDFFromData(resumeData, colorScheme, font) {
   }
   
   // Education
-  if (education && education.length > 0) {
+  if (education && education.length > 0 && !isHidden('education')) {
     addSectionHeader('Education')
     education.forEach(edu => {
-      pdf.setFontSize(11)
+      pdf.setFontSize(11 * fontMultiplier)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor('#1f2937')
       pdf.text(edu.degree || 'Degree', margin, y)
       
       if (edu.graduationDate) {
-        pdf.setFontSize(9)
+        pdf.setFontSize(9 * fontMultiplier)
         pdf.setFont('helvetica', 'normal')
         pdf.setTextColor('#6b7280')
         pdf.text(edu.graduationDate, pageWidth - margin, y, { align: 'right' })
       }
       y += 14
       
-      pdf.setFontSize(10)
+      pdf.setFontSize(10 * fontMultiplier)
       pdf.setTextColor(colorScheme?.primary || '#1e3a5f')
       pdf.text(edu.school || 'School', margin, y)
       y += 14
       
       if (edu.details) {
-        addText(edu.details, 9, false, '#6b7280')
+        addText(edu.details, 9 * fontMultiplier, false, '#6b7280')
       }
       y += 4
     })
   }
   
   // Skills
-  if (skills && skills.length > 0) {
+  if (skills && skills.length > 0 && !isHidden('skills')) {
     addSectionHeader('Skills')
     const skillsText = skills.join('  •  ')
-    addText(skillsText, 9)
+    addText(skillsText, 9 * fontMultiplier)
   }
   
   // Certifications
-  if (certifications && certifications.length > 0) {
+  if (certifications && certifications.length > 0 && !isHidden('certifications')) {
     addSectionHeader('Certifications')
     certifications.forEach(cert => {
       let certText = cert.name || ''
       if (cert.issuer) certText += ` - ${cert.issuer}`
       if (cert.date) certText += ` (${cert.date})`
-      addText(`• ${certText}`, 9)
+      addText(`${bulletChar} ${certText}`, 9 * fontMultiplier)
     })
   }
   

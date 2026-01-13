@@ -35,6 +35,18 @@ const layoutOptions = [
   { id: 'sidebar', name: 'Sidebar', description: 'Skills on side' },
 ]
 
+const defaultSettings = {
+  fontSize: 'medium',
+  lineSpacing: 'normal',
+  margins: 'normal',
+  headerStyle: 'centered',
+  bulletStyle: 'disc',
+  showIcons: true,
+  dateFormat: 'short',
+  sectionOrder: ['summary', 'experience', 'education', 'skills', 'projects', 'certifications'],
+  hiddenSections: [],
+}
+
 const initialResumeData = {
   contact: {
     name: '',
@@ -66,6 +78,7 @@ export const useStore = create((set, get) => ({
   colorScheme: colorSchemes[0],
   font: fontOptions[0],
   layout: layoutOptions[0],
+  settings: defaultSettings,
   colorSchemes,
   fontOptions,
   layoutOptions,
@@ -150,6 +163,7 @@ export const useStore = create((set, get) => ({
   setColorScheme: (scheme) => set({ colorScheme: scheme }),
   setFont: (font) => set({ font: font }),
   setLayout: (layout) => set({ layout: layout }),
+  updateSettings: (settings) => set({ settings }),
   
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message]

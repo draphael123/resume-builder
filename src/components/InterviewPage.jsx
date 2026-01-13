@@ -7,7 +7,7 @@ import { Settings, Download, ChevronLeft, ChevronRight, FileDown } from 'lucide-
 import { generatePDF, generatePDFFromData } from '../utils/pdfGenerator'
 
 function InterviewPage() {
-  const { resumeData, colorScheme, font } = useStore()
+  const { resumeData, colorScheme, font, settings } = useStore()
   const [showCustomization, setShowCustomization] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
@@ -17,7 +17,7 @@ function InterviewPage() {
     
     try {
       // Use the data-based PDF generator (more reliable)
-      generatePDFFromData(resumeData, colorScheme, font)
+      generatePDFFromData(resumeData, colorScheme, font, settings)
     } catch (error) {
       console.error('Error generating PDF:', error)
       
