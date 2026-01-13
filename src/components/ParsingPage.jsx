@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { FileSearch, User, Briefcase, GraduationCap, Wrench, CheckCircle } from 'lucide-react'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set up pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 const parsingSteps = [
   { id: 'reading', label: 'Reading PDF document...', icon: FileSearch },
@@ -21,7 +25,6 @@ function ParsingPage() {
   } = useStore()
   
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [extractedData, setExtractedData] = useState(null)
   
   useEffect(() => {
     const parseResume = async () => {
@@ -31,20 +34,20 @@ function ParsingPage() {
         return
       }
       
-      // Simulate parsing steps with realistic timing
+      // Progress through parsing steps
       for (let i = 0; i < parsingSteps.length - 1; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400))
+        await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 300))
         setCurrentStepIndex(i + 1)
       }
       
-      // Extract text from PDF using FileReader
+      // Extract text from PDF
       try {
         const text = await extractTextFromPDF(file)
-        setOriginalResumeText(text)
+        const cleanedText = cleanText(text)
+        setOriginalResumeText(cleanedText)
         
         // Parse the extracted text
-        const parsed = parseResumeText(text)
-        setExtractedData(parsed)
+        const parsed = parseResumeText(cleanedText)
         
         // Check if user has work experience
         const hasExperience = parsed.experience && parsed.experience.length > 0
@@ -57,32 +60,35 @@ function ParsingPage() {
         setCurrentStepIndex(parsingSteps.length - 1)
         
         // Wait a moment then transition
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 800))
         
-        // Add initial AI message
-        const initialMessage = hasExperience
-          ? {
-              role: 'ai',
-              type: 'card',
-              content: `I've analyzed your resume and found some great content to work with. I noticed you have experience at ${parsed.experience[0]?.company || 'your previous company'}. Let's make your achievements stand out even more.\n\nTo start, I'd like to understand your most impactful work. What would you say was your single biggest accomplishment in your most recent role?`,
-            }
-          : {
-              role: 'ai',
-              type: 'card', 
-              content: `I've analyzed your resume. I notice you may be early in your career or transitioning to a new field - that's perfectly fine! We'll focus on highlighting your skills, projects, and potential.\n\nLet's start with what you're most proud of. What skill or project have you worked on that you feel demonstrates your capabilities best?`,
-            }
+        // Add initial AI message based on what we found
+        let initialMessage
+        if (parsed.contact.name) {
+          initialMessage = {
+            role: 'ai',
+            type: 'card',
+            content: `Great, ${parsed.contact.name}! I've extracted some information from your resume. Now let's make it really shine.\n\nTo start, tell me about your most recent role. What was your biggest achievement or impact there? Be as specific as possible - numbers and outcomes help a lot.`,
+          }
+        } else {
+          initialMessage = {
+            role: 'ai',
+            type: 'card',
+            content: `I've processed your resume. Let's build something compelling together.\n\nFirst, let's get the basics right. What is your full name, and what type of role are you targeting with this resume?`,
+          }
+        }
         
         addMessage(initialMessage)
         setCurrentStep('interview')
         
       } catch (error) {
         console.error('Error parsing PDF:', error)
-        // Still proceed to interview but with empty data
+        // Proceed to interview with empty data
         setOriginalResumeText('')
         addMessage({
           role: 'ai',
           type: 'card',
-          content: `I had some trouble reading your PDF, but no worries - we can build your resume from scratch! Let's start with the basics.\n\nWhat is your full name and what type of role are you targeting?`,
+          content: `I had some trouble reading your PDF, but no worries - we can build your resume together from scratch!\n\nLet's start with the basics. What is your full name and what type of role are you targeting?`,
         })
         setCurrentStep('interview')
       }
@@ -112,7 +118,6 @@ function ParsingPage() {
               const Icon = step.icon
               const isActive = index === currentStepIndex
               const isComplete = index < currentStepIndex
-              const isPending = index > currentStepIndex
               
               return (
                 <div 
@@ -167,47 +172,81 @@ function ParsingPage() {
   )
 }
 
-// Simple text extraction from PDF (simplified version)
+// Extract text from PDF using pdf.js
 async function extractTextFromPDF(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        // For now, we'll use a simplified approach
-        // In production, you'd use pdf.js for proper extraction
-        const arrayBuffer = e.target.result
-        const text = await extractTextSimple(arrayBuffer)
-        resolve(text)
-      } catch (err) {
-        reject(err)
-      }
+  const arrayBuffer = await file.arrayBuffer()
+  
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let fullText = ''
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items
+        .map(item => item.str)
+        .join(' ')
+      fullText += pageText + '\n'
     }
-    reader.onerror = reject
-    reader.readAsArrayBuffer(file)
-  })
+    
+    return fullText
+  } catch (error) {
+    console.error('PDF.js extraction failed:', error)
+    // Fallback: try simple extraction
+    return fallbackExtraction(arrayBuffer)
+  }
 }
 
-async function extractTextSimple(arrayBuffer) {
-  // Convert to string and try to extract readable text
+// Fallback text extraction
+function fallbackExtraction(arrayBuffer) {
   const uint8Array = new Uint8Array(arrayBuffer)
-  let text = ''
-  
-  // Simple text extraction - look for text streams in PDF
   const decoder = new TextDecoder('utf-8', { fatal: false })
   const pdfString = decoder.decode(uint8Array)
   
-  // Extract text between parentheses (PDF text strings)
-  const textMatches = pdfString.match(/\(([^)]+)\)/g)
-  if (textMatches) {
-    text = textMatches
-      .map(match => match.slice(1, -1))
-      .filter(t => t.length > 1 && !/^[0-9.]+$/.test(t))
-      .join(' ')
+  // Look for text in BT...ET blocks (PDF text objects)
+  const textBlocks = []
+  const btPattern = /BT[\s\S]*?ET/g
+  const matches = pdfString.match(btPattern) || []
+  
+  for (const block of matches) {
+    // Extract text from Tj and TJ operators
+    const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g) || []
+    const tjTexts = tjMatches.map(m => {
+      const match = m.match(/\(([^)]*)\)/)
+      return match ? match[1] : ''
+    })
+    textBlocks.push(...tjTexts)
   }
   
-  return text
+  return textBlocks.join(' ')
 }
 
+// Clean extracted text - remove garbled characters
+function cleanText(text) {
+  if (!text) return ''
+  
+  // Remove non-printable characters and weird unicode
+  let cleaned = text
+    // Keep only printable ASCII and common unicode
+    .replace(/[^\x20-\x7E\u00A0-\u024F\u1E00-\u1EFF]/g, ' ')
+    // Remove excessive whitespace
+    .replace(/\s+/g, ' ')
+    // Remove isolated single characters (often noise)
+    .replace(/\s[a-zA-Z]\s/g, ' ')
+    .trim()
+  
+  // If the result is mostly garbage (high ratio of special chars), return empty
+  const alphaNumCount = (cleaned.match(/[a-zA-Z0-9]/g) || []).length
+  const totalCount = cleaned.length
+  
+  if (totalCount > 0 && alphaNumCount / totalCount < 0.5) {
+    return ''
+  }
+  
+  return cleaned
+}
+
+// Parse resume text into structured data
 function parseResumeText(text) {
   const data = {
     contact: {
@@ -226,32 +265,64 @@ function parseResumeText(text) {
     projects: [],
   }
   
+  if (!text || text.length < 10) return data
+  
   // Extract email
-  const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/)
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
   if (emailMatch) data.contact.email = emailMatch[0]
   
-  // Extract phone
-  const phoneMatch = text.match(/(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/)
-  if (phoneMatch) data.contact.phone = phoneMatch[0]
+  // Extract phone - various formats
+  const phonePatterns = [
+    /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
+    /\+1[-.\s]?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/,
+  ]
+  for (const pattern of phonePatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      data.contact.phone = match[0]
+      break
+    }
+  }
   
   // Extract LinkedIn
-  const linkedinMatch = text.match(/linkedin\.com\/in\/[\w-]+/)
-  if (linkedinMatch) data.contact.linkedin = 'https://' + linkedinMatch[0]
+  const linkedinMatch = text.match(/linkedin\.com\/in\/[\w-]+/i)
+  if (linkedinMatch) data.contact.linkedin = 'https://' + linkedinMatch[0].toLowerCase()
   
-  // Try to extract name (usually at the beginning)
-  const lines = text.split(/\s+/)
-  if (lines.length >= 2) {
-    // Assume first few words might be name if they look like proper nouns
-    const potentialName = lines.slice(0, 3).filter(word => 
-      word.length > 1 && 
-      word[0] === word[0].toUpperCase() &&
-      !/[@.]/.test(word)
-    ).join(' ')
-    if (potentialName) data.contact.name = potentialName
+  // Extract name - look for capitalized words at the start
+  const lines = text.split(/\n/)
+  const firstLine = lines[0]?.trim() || ''
+  
+  // Name is usually the first prominent text
+  const nameMatch = firstLine.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/)
+  if (nameMatch) {
+    data.contact.name = nameMatch[1]
+  } else {
+    // Try to find a name pattern anywhere in first few lines
+    const namePattern = /([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+      const match = lines[i].match(namePattern)
+      if (match && match[1].length < 40) {
+        data.contact.name = match[1]
+        break
+      }
+    }
   }
+  
+  // Look for common skills
+  const commonSkills = [
+    'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'SQL', 'AWS', 'Docker',
+    'Kubernetes', 'Git', 'Agile', 'Scrum', 'TypeScript', 'HTML', 'CSS',
+    'Machine Learning', 'Data Analysis', 'Excel', 'Salesforce', 'Marketing',
+    'Project Management', 'Leadership', 'Communication', 'C++', 'C#', 'Ruby',
+    'Go', 'Rust', 'Swift', 'Kotlin', 'PHP', 'MongoDB', 'PostgreSQL', 'Redis'
+  ]
+  
+  const foundSkills = commonSkills.filter(skill => 
+    text.toLowerCase().includes(skill.toLowerCase())
+  )
+  data.skills = foundSkills
   
   return data
 }
 
 export default ParsingPage
-

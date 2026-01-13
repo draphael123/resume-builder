@@ -1,11 +1,39 @@
 import { useStore } from '../store/useStore'
-import { Mail, Phone, MapPin, Linkedin, Globe } from 'lucide-react'
+import { Mail, Phone, MapPin, Linkedin, Globe, FileText } from 'lucide-react'
+
+// Helper to check if text is displayable (not garbled)
+function isCleanText(text) {
+  if (!text || typeof text !== 'string') return false
+  // Check if mostly alphanumeric/standard characters
+  const alphaNum = (text.match(/[a-zA-Z0-9\s.,!?@\-()]/g) || []).length
+  return alphaNum / text.length > 0.7
+}
+
+// Clean any potentially garbled text
+function cleanDisplayText(text) {
+  if (!text) return ''
+  if (!isCleanText(text)) return ''
+  return text.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '').trim()
+}
 
 function ResumePreview() {
-  const { resumeData, colorScheme, font, layout } = useStore()
+  const { resumeData, colorScheme, font } = useStore()
   const { contact, summary, experience, education, skills, certifications, projects } = resumeData
   
-  const hasContent = contact.name || summary || experience.length > 0 || education.length > 0 || skills.length > 0
+  // Clean all text fields
+  const cleanContact = {
+    name: cleanDisplayText(contact.name),
+    email: cleanDisplayText(contact.email),
+    phone: cleanDisplayText(contact.phone),
+    location: cleanDisplayText(contact.location),
+    linkedin: cleanDisplayText(contact.linkedin),
+    website: cleanDisplayText(contact.website),
+  }
+  
+  const cleanSummary = cleanDisplayText(summary)
+  
+  const hasContent = cleanContact.name || cleanSummary || experience.length > 0 || 
+                     education.length > 0 || skills.length > 0 || projects.length > 0
   
   return (
     <div className="w-full h-full overflow-auto p-6 flex justify-center">
@@ -17,65 +45,66 @@ function ResumePreview() {
           backgroundColor: colorScheme.secondary,
           color: '#1f2937',
           padding: '0.75in',
-          transform: 'scale(0.75)',
+          transform: 'scale(0.7)',
           transformOrigin: 'top center',
         }}
       >
         {!hasContent ? (
-          <div className="h-full flex items-center justify-center text-gray-400">
-            <div className="text-center">
-              <p className="text-lg">Your resume will appear here</p>
-              <p className="text-sm mt-2">Answer questions to build your content</p>
-            </div>
+          <div className="h-full flex flex-col items-center justify-center text-gray-400">
+            <FileText size={48} strokeWidth={1} className="mb-4 opacity-50" />
+            <p className="text-lg font-medium">Your resume preview</p>
+            <p className="text-sm mt-2 text-center max-w-xs">
+              Answer the interview questions and watch your resume build in real-time
+            </p>
           </div>
         ) : (
           <>
             {/* Header / Contact */}
             <header className="text-center mb-6" style={{ borderBottom: `2px solid ${colorScheme.primary}`, paddingBottom: '12px' }}>
-              {contact.name && (
+              {cleanContact.name && (
                 <h1 style={{ color: colorScheme.primary, fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>
-                  {contact.name}
+                  {cleanContact.name}
                 </h1>
               )}
               <div className="flex flex-wrap justify-center gap-4 text-sm" style={{ color: '#4b5563' }}>
-                {contact.email && (
+                {cleanContact.email && (
                   <span className="flex items-center gap-1">
                     <Mail size={12} />
-                    {contact.email}
+                    {cleanContact.email}
                   </span>
                 )}
-                {contact.phone && (
+                {cleanContact.phone && (
                   <span className="flex items-center gap-1">
                     <Phone size={12} />
-                    {contact.phone}
+                    {cleanContact.phone}
                   </span>
                 )}
-                {contact.location && (
+                {cleanContact.location && (
                   <span className="flex items-center gap-1">
                     <MapPin size={12} />
-                    {contact.location}
+                    {cleanContact.location}
                   </span>
                 )}
-                {contact.linkedin && (
+                {cleanContact.linkedin && (
                   <span className="flex items-center gap-1">
                     <Linkedin size={12} />
-                    {contact.linkedin.replace('https://', '')}
+                    {cleanContact.linkedin.replace('https://', '')}
                   </span>
                 )}
-                {contact.website && (
+                {cleanContact.website && (
                   <span className="flex items-center gap-1">
                     <Globe size={12} />
-                    {contact.website.replace('https://', '')}
+                    {cleanContact.website.replace('https://', '')}
                   </span>
                 )}
               </div>
             </header>
             
             {/* Summary */}
-            {summary && (
+            {cleanSummary && (
               <section className="mb-5">
                 <h2 style={{ color: colorScheme.primary }}>Professional Summary</h2>
-                <p style={{ fontSize: '11px', lineHeight: 1.6 }}>{summary}</p>
+                <p style={{ fontSize: '11px', lineHeight: 1.6 }}>{cleanSummary}</p>
               </section>
             )}
             
@@ -87,22 +116,27 @@ function ResumePreview() {
                   <div key={index} className="mb-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 style={{ fontSize: '13px', fontWeight: 600 }}>{exp.title}</h3>
+                        <h3 style={{ fontSize: '13px', fontWeight: 600 }}>
+                          {cleanDisplayText(exp.title) || 'Position'}
+                        </h3>
                         <p style={{ fontSize: '11px', color: colorScheme.primary, fontWeight: 500 }}>
-                          {exp.company}
+                          {cleanDisplayText(exp.company) || 'Company'}
                         </p>
                       </div>
                       <p style={{ fontSize: '10px', color: '#6b7280' }}>
-                        {exp.startDate} - {exp.endDate || 'Present'}
+                        {cleanDisplayText(exp.startDate)} - {cleanDisplayText(exp.endDate) || 'Present'}
                       </p>
                     </div>
                     {exp.achievements && exp.achievements.length > 0 && (
                       <ul style={{ marginTop: '6px' }}>
-                        {exp.achievements.map((achievement, i) => (
-                          <li key={i} style={{ fontSize: '11px', marginBottom: '3px' }}>
-                            {achievement}
-                          </li>
-                        ))}
+                        {exp.achievements.map((achievement, i) => {
+                          const cleanAchievement = cleanDisplayText(achievement)
+                          return cleanAchievement ? (
+                            <li key={i} style={{ fontSize: '11px', marginBottom: '3px' }}>
+                              {cleanAchievement}
+                            </li>
+                          ) : null
+                        })}
                       </ul>
                     )}
                   </div>
@@ -116,11 +150,15 @@ function ResumePreview() {
                 <h2 style={{ color: colorScheme.primary }}>Projects</h2>
                 {projects.map((project, index) => (
                   <div key={index} className="mb-3">
-                    <h3 style={{ fontSize: '13px', fontWeight: 600 }}>{project.name}</h3>
-                    <p style={{ fontSize: '11px', lineHeight: 1.5 }}>{project.description}</p>
+                    <h3 style={{ fontSize: '13px', fontWeight: 600 }}>
+                      {cleanDisplayText(project.name)}
+                    </h3>
+                    <p style={{ fontSize: '11px', lineHeight: 1.5 }}>
+                      {cleanDisplayText(project.description)}
+                    </p>
                     {project.technologies && (
                       <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
-                        Technologies: {project.technologies}
+                        Technologies: {cleanDisplayText(project.technologies)}
                       </p>
                     )}
                   </div>
@@ -136,13 +174,21 @@ function ResumePreview() {
                   <div key={index} className="mb-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 style={{ fontSize: '13px', fontWeight: 600 }}>{edu.degree}</h3>
-                        <p style={{ fontSize: '11px', color: colorScheme.primary }}>{edu.school}</p>
+                        <h3 style={{ fontSize: '13px', fontWeight: 600 }}>
+                          {cleanDisplayText(edu.degree)}
+                        </h3>
+                        <p style={{ fontSize: '11px', color: colorScheme.primary }}>
+                          {cleanDisplayText(edu.school)}
+                        </p>
                       </div>
-                      <p style={{ fontSize: '10px', color: '#6b7280' }}>{edu.graduationDate}</p>
+                      <p style={{ fontSize: '10px', color: '#6b7280' }}>
+                        {cleanDisplayText(edu.graduationDate)}
+                      </p>
                     </div>
                     {edu.details && (
-                      <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>{edu.details}</p>
+                      <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
+                        {cleanDisplayText(edu.details)}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -154,21 +200,24 @@ function ResumePreview() {
               <section className="mb-5">
                 <h2 style={{ color: colorScheme.primary }}>Skills</h2>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {skills.map((skill, index) => (
-                    <span 
-                      key={index}
-                      style={{ 
-                        fontSize: '10px',
-                        padding: '3px 10px',
-                        backgroundColor: `${colorScheme.primary}15`,
-                        color: colorScheme.primary,
-                        borderRadius: '4px',
-                        fontWeight: 500
-                      }}
-                    >
-                      {skill}
-                    </span>
-                  ))}
+                  {skills.map((skill, index) => {
+                    const cleanSkill = cleanDisplayText(skill)
+                    return cleanSkill ? (
+                      <span 
+                        key={index}
+                        style={{ 
+                          fontSize: '10px',
+                          padding: '3px 10px',
+                          backgroundColor: `${colorScheme.primary}15`,
+                          color: colorScheme.primary,
+                          borderRadius: '4px',
+                          fontWeight: 500
+                        }}
+                      >
+                        {cleanSkill}
+                      </span>
+                    ) : null
+                  })}
                 </div>
               </section>
             )}
@@ -178,13 +227,16 @@ function ResumePreview() {
               <section className="mb-5">
                 <h2 style={{ color: colorScheme.primary }}>Certifications</h2>
                 <ul>
-                  {certifications.map((cert, index) => (
-                    <li key={index} style={{ fontSize: '11px', marginBottom: '3px' }}>
-                      <strong>{cert.name}</strong>
-                      {cert.issuer && ` - ${cert.issuer}`}
-                      {cert.date && ` (${cert.date})`}
-                    </li>
-                  ))}
+                  {certifications.map((cert, index) => {
+                    const cleanName = cleanDisplayText(cert.name)
+                    return cleanName ? (
+                      <li key={index} style={{ fontSize: '11px', marginBottom: '3px' }}>
+                        <strong>{cleanName}</strong>
+                        {cert.issuer && ` - ${cleanDisplayText(cert.issuer)}`}
+                        {cert.date && ` (${cleanDisplayText(cert.date)})`}
+                      </li>
+                    ) : null
+                  })}
                 </ul>
               </section>
             )}
@@ -196,4 +248,3 @@ function ResumePreview() {
 }
 
 export default ResumePreview
-
