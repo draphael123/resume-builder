@@ -2,340 +2,375 @@ import { useStore } from '../store/useStore'
 
 // Interview state tracking
 let interviewState = {
-  currentTopic: 'experience',
-  experienceIndex: 0,
+  phase: 'name', // 'name' | 'role' | 'experience' | 'achievements' | 'skills' | 'education' | 'summary' | 'complete'
   questionsAsked: 0,
-  maxQuestions: 15,
-  usedPushbacks: [], // Track which pushbacks we've used
-  usedQuestions: [], // Track which questions we've used
-  lastPushbackIndex: -1,
-  gatheredInfo: {
-    experiences: [],
-    skills: [],
-    education: [],
-    summary: '',
+  usedPushbacks: [],
+  currentExperience: null,
+  achievementCount: 0,
+}
+
+// Get the question for each phase
+function getPhaseQuestion(phase, store) {
+  const questions = {
+    name: [
+      "Let's start with the basics. What is your full name?",
+      "First things first - what's your full name as you'd like it to appear on your resume?",
+      "To get started, please tell me your full name.",
+    ],
+    role: [
+      "Great! What's your current or most recent job title, and at which company?",
+      "What position do you currently hold (or most recently held), and where?",
+      "Tell me about your current or last role - what was your title and company?",
+    ],
+    experience: [
+      "How long were you in this role? And what were the dates (start and end)?",
+      "What was the timeframe for this position? When did you start and end (or are you still there)?",
+    ],
+    achievements: [
+      "Now for the important part - what were your top achievements in this role? Think about impact, numbers, and results.",
+      "What accomplishments are you most proud of in this position? Be specific with metrics if you can.",
+      "Tell me about your biggest wins in this job. What did you achieve? How did you make a difference?",
+      "What results did you deliver? Think revenue, efficiency, team growth, projects completed.",
+      "What's another achievement from this role you'd like to highlight?",
+    ],
+    skills: [
+      "Let's talk skills. What technical skills, tools, and technologies are you proficient in?",
+      "What are your key skills? List the technical tools, software, and methodologies you know well.",
+    ],
+    education: [
+      "Tell me about your education. What degree(s) do you have, from which school(s), and when did you graduate?",
+      "What's your educational background? Include degrees, schools, and graduation years.",
+    ],
+    summary: [
+      "Finally, how would you summarize yourself professionally in 2-3 sentences? What makes you stand out?",
+      "To wrap up, give me a brief professional summary - who are you and what value do you bring?",
+    ],
   }
+  
+  const phaseQuestions = questions[phase] || questions.achievements
+  return phaseQuestions[Math.floor(Math.random() * phaseQuestions.length)]
 }
 
-// Varied question templates for different topics
-const questionTemplates = {
-  experience: [
-    {
-      id: 'exp1',
-      question: (data) => `Tell me more about your role at ${data.company || 'your most recent company'}. What were your primary responsibilities?`,
-    },
-    {
-      id: 'exp2',
-      question: () => `What was your most significant achievement in this role? I'm looking for something that made a real difference.`,
-    },
-    {
-      id: 'exp3',
-      question: () => `Were there any challenges or problems you solved that you're particularly proud of?`,
-    },
-    {
-      id: 'exp4',
-      question: () => `Did you lead any initiatives, projects, or teams? Tell me about your leadership experience.`,
-    },
-    {
-      id: 'exp5',
-      question: () => `What processes or systems did you improve or create? Walk me through a specific example.`,
-    },
-    {
-      id: 'exp6',
-      question: () => `How did you contribute to revenue, cost savings, or efficiency gains in your role?`,
-    },
-    {
-      id: 'exp7',
-      question: () => `What's something you built or delivered that you're especially proud of?`,
-    },
-    {
-      id: 'exp8',
-      question: () => `Tell me about a time you went above and beyond your job description. What happened?`,
-    },
-  ],
-  noExperience: [
-    {
-      id: 'noexp1',
-      question: () => `What's a project you've worked on that you're most proud of? This could be academic, personal, or volunteer work.`,
-    },
-    {
-      id: 'noexp2',
-      question: () => `What skills have you been developing? Include both technical skills and soft skills.`,
-    },
-    {
-      id: 'noexp3',
-      question: () => `Tell me about any leadership roles you've had - clubs, organizations, team projects, or volunteer work.`,
-    },
-    {
-      id: 'noexp4',
-      question: () => `What certifications, courses, or self-directed learning have you completed recently?`,
-    },
-    {
-      id: 'noexp5',
-      question: () => `Describe a group project where you made a significant contribution. What was your role?`,
-    },
-  ],
-  skills: [
-    {
-      id: 'skill1',
-      question: () => `Let's talk about your technical skills. What tools, technologies, or methodologies are you proficient in?`,
-    },
-    {
-      id: 'skill2',
-      question: () => `What about soft skills? Communication, leadership, problem-solving - what sets you apart?`,
-    },
-    {
-      id: 'skill3',
-      question: () => `Which of your skills do you consider to be at an expert level? How did you develop that expertise?`,
-    },
-  ],
-  education: [
-    {
-      id: 'edu1',
-      question: () => `Tell me about your educational background. What degrees or certifications do you have?`,
-    },
-    {
-      id: 'edu2',
-      question: () => `Were there any academic achievements, honors, or relevant coursework worth highlighting?`,
-    },
-  ],
-  summary: [
-    {
-      id: 'sum1',
-      question: () => `Based on everything we've discussed, how would you describe your professional identity in one or two sentences?`,
-    },
-    {
-      id: 'sum2',
-      question: () => `What makes you unique compared to other candidates in your field?`,
-    },
-  ],
-}
-
-// Extensive pushback responses - varied language for follow-up questions
+// Pushback responses for vague answers
 const pushbackResponses = [
-  // Asking for numbers/metrics
-  "That sounds promising! Can you put a number on it? Even a rough estimate like 'about 20%' or 'around 50 people' helps paint the picture.",
-  "Good foundation there. What were the actual results? Think metrics, percentages, dollar amounts, or time saved.",
-  "I want to help you quantify this. How many people did this affect? What was the scale?",
-  "Numbers really make achievements pop. Can you estimate the impact - maybe in terms of revenue, users, or percentage improvement?",
-  "That's interesting context. What changed measurably as a result? Even ballpark figures work.",
-  
-  // Asking for specifics/details
-  "Let's dig deeper into that. What specifically did YOU do versus the team?",
-  "Walk me through the details a bit more. What was the situation, your action, and the outcome?",
-  "Can you get more granular? I'd love to understand exactly what you contributed.",
-  "That's a solid start. Now help me visualize it - what did success actually look like?",
-  "Interesting! Tell me more about your specific role in making that happen.",
-  
-  // Encouraging stronger language
-  "You might be underselling yourself here. What was the real impact of your work?",
-  "Don't be modest! What tangible difference did this make for the business or team?",
-  "I sense there's more to this story. What outcome are you most proud of?",
-  "That sounds like there's a bigger win hiding in there. What results can you point to?",
-  "Push yourself here - what's the strongest way you could describe this achievement?",
-  
-  // Probing for context
-  "Help me understand the scope better. How big was this project? How long did it take?",
-  "What problem were you actually solving? And how did your solution perform?",
-  "Give me the before and after. What was the situation like before, and what changed?",
-  "What would have happened if you hadn't done this work? That contrast can be powerful.",
-  "Who benefited from this? Customers, teammates, the company? How many?",
-  
-  // Friendly but direct
-  "I need a bit more here to make this shine on your resume. What concrete outcomes can you share?",
-  "Almost there! Add one specific detail or number to make this really compelling.",
-  "This has potential. Can you give me one measurable result to anchor it?",
-  "Good direction! Now sharpen it with a specific example or metric.",
-  "We can make this stronger. What's the most impressive thing about what you accomplished?",
+  "Can you be more specific? Numbers and concrete results make a big difference.",
+  "That's a start - can you quantify the impact? Percentages, dollars, time saved?",
+  "Help me understand the scale. How many people/projects/dollars were involved?",
+  "What was the measurable outcome? Even estimates help.",
+  "Push yourself here - what's the most impressive way to describe this?",
+  "I need specifics to make this shine. What were the actual results?",
+  "Good foundation. Now add a number or concrete outcome to make it pop.",
+  "Don't undersell yourself! What tangible difference did you make?",
 ]
 
-// Transition phrases to vary the flow
-const transitionPhrases = [
-  "Great, let's explore another angle.",
-  "Thanks for sharing that. Now,",
-  "That's helpful context. Moving on,",
-  "Perfect. Let me ask you about something else.",
-  "Good stuff. Shifting gears a bit,",
-  "Excellent. Here's another question for you:",
-  "I appreciate that detail. Next,",
-  "Got it. Let's talk about",
-  "That gives me a good picture. Now,",
-  "Noted. Let me ask you this:",
-]
-
-// Get a random item from array, avoiding recent picks
-function getRandomUnused(array, usedIds, idKey = 'id') {
-  const unused = array.filter(item => !usedIds.includes(item[idKey] || item))
-  if (unused.length === 0) {
-    // Reset if we've used everything
-    usedIds.length = 0
-    return array[Math.floor(Math.random() * array.length)]
-  }
-  return unused[Math.floor(Math.random() * unused.length)]
-}
-
-// Get pushback that hasn't been used recently
 function getUniquePushback() {
   const available = pushbackResponses.filter((_, i) => !interviewState.usedPushbacks.includes(i))
-  
   if (available.length === 0) {
-    // Reset tracking if we've used all
     interviewState.usedPushbacks = []
-    const index = Math.floor(Math.random() * pushbackResponses.length)
-    interviewState.usedPushbacks.push(index)
-    return pushbackResponses[index]
+    return pushbackResponses[0]
   }
-  
-  const randomIndex = pushbackResponses.indexOf(available[Math.floor(Math.random() * available.length)])
-  interviewState.usedPushbacks.push(randomIndex)
-  
-  // Keep only last 10 to allow eventual reuse
-  if (interviewState.usedPushbacks.length > 10) {
-    interviewState.usedPushbacks.shift()
-  }
-  
-  return pushbackResponses[randomIndex]
+  const selected = available[Math.floor(Math.random() * available.length)]
+  interviewState.usedPushbacks.push(pushbackResponses.indexOf(selected))
+  return selected
 }
 
-// Detect if an answer is vague
-function isVagueAnswer(answer) {
-  const vagueIndicators = [
-    'helped', 'assisted', 'worked on', 'was involved', 'contributed to',
-    'various', 'multiple', 'many', 'some', 'stuff', 'things', 'etc',
-    'responsibilities included', 'responsible for', 'duties'
-  ]
-  const lowered = answer.toLowerCase()
-  
-  // Check for vague language
-  const hasVagueWords = vagueIndicators.some(word => lowered.includes(word))
-  
-  // Check for lack of numbers
-  const hasNumbers = /\d/.test(answer)
-  
-  // Short answers are often vague
-  const wordCount = answer.split(' ').length
-  const isShort = wordCount < 12
-  
-  // Very short answers are always considered vague
-  if (wordCount < 6) return true
-  
-  return (hasVagueWords && !hasNumbers) || (isShort && !hasNumbers)
-}
-
-// Parse user response and update resume data
-function parseAndUpdateResume(userMessage, topic) {
+// Parse and save user responses based on current phase
+function parseAndSaveResponse(userMessage, phase) {
   const store = useStore.getState()
+  const message = userMessage.trim()
   
-  // Extract skills if mentioned
-  const skillKeywords = [
-    'javascript', 'python', 'java', 'react', 'node', 'sql', 'aws', 'docker',
-    'kubernetes', 'git', 'agile', 'scrum', 'leadership', 'communication',
-    'project management', 'data analysis', 'machine learning', 'excel',
-    'salesforce', 'marketing', 'design', 'photoshop', 'figma', 'html', 'css',
-    'typescript', 'c++', 'c#', 'ruby', 'go', 'rust', 'swift', 'kotlin',
-    'angular', 'vue', 'mongodb', 'postgresql', 'redis', 'graphql', 'rest api',
-    'tensorflow', 'pytorch', 'tableau', 'power bi', 'jira', 'confluence'
-  ]
-  
-  const foundSkills = skillKeywords.filter(skill => 
-    userMessage.toLowerCase().includes(skill.toLowerCase())
-  )
-  
-  if (foundSkills.length > 0) {
-    const currentSkills = store.resumeData.skills
-    const newSkills = foundSkills.filter(s => 
-      !currentSkills.map(cs => cs.toLowerCase()).includes(s.toLowerCase())
-    )
-    if (newSkills.length > 0) {
-      store.setSkills([...currentSkills, ...newSkills.map(s => 
-        s.charAt(0).toUpperCase() + s.slice(1)
-      )])
+  switch (phase) {
+    case 'name': {
+      // Extract name - usually the whole message or first proper nouns
+      let name = message
+      // Clean up common prefixes
+      name = name.replace(/^(my name is|i'm|i am|it's|its)\s+/i, '')
+      // Capitalize properly
+      name = name.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ')
+      // Limit to reasonable length
+      if (name.length > 50) name = name.substring(0, 50)
+      
+      store.updateContactField('name', name)
+      return true
     }
-  }
-  
-  // Extract achievements from experience discussions
-  if (topic === 'experience' || topic === 'noExperience') {
-    const sentences = userMessage.split(/[.!]/).filter(s => s.trim().length > 15)
     
-    sentences.forEach(sentence => {
-      const achievementIndicators = [
-        'increased', 'decreased', 'improved', 'led', 'managed', 'created',
-        'developed', 'launched', 'built', 'saved', 'generated', 'reduced',
-        'achieved', 'delivered', 'implemented', 'designed', 'established',
-        'grew', 'streamlined', 'automated', 'optimized', 'transformed'
+    case 'role': {
+      // Extract job title and company
+      let title = ''
+      let company = ''
+      
+      // Common patterns: "Title at Company", "Title, Company", "Title @ Company"
+      const patterns = [
+        /^(.+?)\s+at\s+(.+)$/i,
+        /^(.+?)\s*@\s*(.+)$/i,
+        /^(.+?),\s*(.+)$/,
+        /^(.+?)\s+for\s+(.+)$/i,
+        /^(.+?)\s+with\s+(.+)$/i,
       ]
       
-      if (achievementIndicators.some(ind => sentence.toLowerCase().includes(ind))) {
-        interviewState.gatheredInfo.experiences.push(sentence.trim())
+      let matched = false
+      for (const pattern of patterns) {
+        const match = message.match(pattern)
+        if (match) {
+          title = match[1].trim()
+          company = match[2].trim()
+          matched = true
+          break
+        }
       }
-    })
+      
+      if (!matched) {
+        // Just use the whole thing as title if no pattern matches
+        title = message
+      }
+      
+      // Clean up
+      title = title.replace(/^(i am|i'm|i was|as)\s+(a|an)?\s*/i, '')
+      
+      // Store in current experience
+      interviewState.currentExperience = {
+        title: title,
+        company: company || 'Company',
+        startDate: '',
+        endDate: 'Present',
+        achievements: []
+      }
+      
+      return true
+    }
+    
+    case 'experience': {
+      // Extract dates
+      const exp = interviewState.currentExperience
+      if (!exp) return false
+      
+      // Look for date patterns
+      const datePatterns = [
+        /(\d{4})\s*[-–to]+\s*(present|\d{4}|current|now)/i,
+        /(\w+\s+\d{4})\s*[-–to]+\s*(present|\w+\s+\d{4}|current|now)/i,
+        /from\s+(\d{4}|\w+\s+\d{4})\s*(?:to|until|-)?\s*(present|\d{4}|\w+\s+\d{4}|current|now)?/i,
+        /since\s+(\d{4}|\w+\s+\d{4})/i,
+        /(\d+)\s*(?:years?|yrs?)/i,
+      ]
+      
+      for (const pattern of datePatterns) {
+        const match = message.match(pattern)
+        if (match) {
+          if (match[1]) exp.startDate = match[1]
+          if (match[2]) exp.endDate = match[2].replace(/current|now/i, 'Present')
+          break
+        }
+      }
+      
+      // Default if nothing found
+      if (!exp.startDate) exp.startDate = '2020'
+      
+      return true
+    }
+    
+    case 'achievements': {
+      const exp = interviewState.currentExperience
+      if (!exp) return false
+      
+      // Split by sentences or bullet-like patterns
+      const achievements = message
+        .split(/[.;]|\n|•|·|-(?=\s)/)
+        .map(s => s.trim())
+        .filter(s => s.length > 10)
+      
+      if (achievements.length > 0) {
+        // Clean up and add each achievement
+        achievements.forEach(achievement => {
+          let cleaned = achievement
+            .replace(/^(i\s+|we\s+)/i, '')
+            .replace(/^(also\s+|and\s+)/i, '')
+          
+          // Capitalize first letter
+          cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+          
+          // Add if not duplicate
+          if (!exp.achievements.includes(cleaned) && cleaned.length > 10) {
+            exp.achievements.push(cleaned)
+          }
+        })
+        
+        interviewState.achievementCount++
+        return true
+      }
+      
+      return false
+    }
+    
+    case 'skills': {
+      // Extract skills from the message
+      const skillsList = message
+        .split(/[,;]|\band\b|\n/)
+        .map(s => s.trim())
+        .filter(s => s.length > 1 && s.length < 50)
+        .map(s => {
+          // Capitalize first letter
+          return s.charAt(0).toUpperCase() + s.slice(1)
+        })
+      
+      if (skillsList.length > 0) {
+        store.setSkills(skillsList)
+        return true
+      }
+      
+      // Fallback: look for known skills
+      const knownSkills = [
+        'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'SQL', 'AWS', 'Docker',
+        'Kubernetes', 'Git', 'Agile', 'Scrum', 'TypeScript', 'HTML', 'CSS',
+        'Machine Learning', 'Data Analysis', 'Excel', 'Salesforce', 'Marketing',
+        'Project Management', 'Leadership', 'Communication', 'C++', 'C#', 'Ruby',
+        'Go', 'Rust', 'Swift', 'Kotlin', 'PHP', 'MongoDB', 'PostgreSQL', 'Redis',
+        'Angular', 'Vue', 'GraphQL', 'REST API', 'TensorFlow', 'PyTorch'
+      ]
+      
+      const found = knownSkills.filter(skill => 
+        message.toLowerCase().includes(skill.toLowerCase())
+      )
+      
+      if (found.length > 0) {
+        store.setSkills(found)
+        return true
+      }
+      
+      return false
+    }
+    
+    case 'education': {
+      // Extract education info
+      let degree = ''
+      let school = ''
+      let year = ''
+      
+      // Look for degree
+      const degreePatterns = [
+        /(bachelor'?s?|master'?s?|phd|ph\.d|doctorate|associate'?s?|mba|bs|ba|ms|ma)\s*(of|in|degree)?\s*([^,from]+)?/i,
+        /(b\.?s\.?|b\.?a\.?|m\.?s\.?|m\.?a\.?|m\.?b\.?a\.?)\s*(in)?\s*([^,from]+)?/i,
+      ]
+      
+      for (const pattern of degreePatterns) {
+        const match = message.match(pattern)
+        if (match) {
+          degree = match[0].trim()
+          break
+        }
+      }
+      
+      // Look for school
+      const schoolPatterns = [
+        /(?:from|at)\s+([A-Z][^,.\d]+(?:University|College|Institute|School)[^,.\d]*)/i,
+        /(?:from|at)\s+([A-Z][^,.]+)/i,
+        /(University\s+of\s+[A-Z][^,.]+)/i,
+        /([A-Z][a-z]+\s+(?:University|College|Institute|School))/i,
+      ]
+      
+      for (const pattern of schoolPatterns) {
+        const match = message.match(pattern)
+        if (match) {
+          school = match[1].trim()
+          break
+        }
+      }
+      
+      // Look for year
+      const yearMatch = message.match(/\b(19|20)\d{2}\b/)
+      if (yearMatch) {
+        year = yearMatch[0]
+      }
+      
+      // Default if nothing parsed
+      if (!degree) degree = message.substring(0, 50)
+      
+      store.addEducation({
+        degree: degree,
+        school: school || 'University',
+        graduationDate: year || '',
+        details: ''
+      })
+      
+      return true
+    }
+    
+    case 'summary': {
+      // Save as professional summary
+      let summary = message
+        .replace(/^(i am|i'm|i would describe myself as)\s*/i, '')
+        .trim()
+      
+      summary = summary.charAt(0).toUpperCase() + summary.slice(1)
+      
+      store.updateResumeField('summary', summary)
+      return true
+    }
+    
+    default:
+      return false
   }
-  
-  return foundSkills.length > 0 || topic === 'experience'
 }
 
-// Get next question based on interview state
+// Determine if answer is too vague
+function isVagueAnswer(message) {
+  const words = message.trim().split(/\s+/)
+  return words.length < 5
+}
+
+// Get next question and advance phase
 function getNextQuestion(userMessage) {
   const store = useStore.getState()
-  const hasExperience = store.hasWorkExperience
   
-  // Check if we should push back on vague answer (but not too often)
-  const shouldPushback = isVagueAnswer(userMessage) && 
-                         interviewState.questionsAsked > 1 &&
-                         Math.random() > 0.3 // 70% chance to pushback on vague answers
+  // Save the response for current phase
+  const saved = parseAndSaveResponse(userMessage, interviewState.phase)
   
-  if (shouldPushback) {
+  // Check for vague answers in achievement phase
+  if (interviewState.phase === 'achievements' && isVagueAnswer(userMessage)) {
     return {
       content: getUniquePushback(),
-      hint: 'Specific details help your resume stand out',
       isFollowUp: true
     }
   }
   
-  // Parse the message and update resume data
-  parseAndUpdateResume(userMessage, interviewState.currentTopic)
-  
   interviewState.questionsAsked++
   
-  // Determine current topic based on progress
-  const topics = hasExperience 
-    ? ['experience', 'experience', 'experience', 'skills', 'education', 'summary']
-    : ['noExperience', 'noExperience', 'skills', 'education', 'summary']
+  // Determine next phase
+  const phaseOrder = ['name', 'role', 'experience', 'achievements', 'skills', 'education', 'summary', 'complete']
+  const currentIndex = phaseOrder.indexOf(interviewState.phase)
   
-  const topicIndex = Math.min(interviewState.questionsAsked - 1, topics.length - 1)
-  interviewState.currentTopic = topics[topicIndex]
-  
-  // Check if interview should complete
-  if (interviewState.questionsAsked >= interviewState.maxQuestions || 
-      (interviewState.currentTopic === 'summary' && interviewState.questionsAsked > topics.length + 1)) {
-    
-    const completionMessages = [
-      `I think I have a solid picture of your background now. Based on our conversation, I've built a resume highlighting your key achievements and skills.\n\nCheck out the preview on the right - you can customize colors, fonts, and layout using the Customize button. When you're happy with it, hit Download PDF.\n\nAnything you'd like to add or change?`,
-      `Excellent! I've gathered enough to create a compelling resume for you. Take a look at the preview and feel free to customize the styling.\n\nThe Customize panel lets you adjust colors, fonts, and layout. Once it looks good, download your PDF.\n\nWant to add anything else before we wrap up?`,
-      `We've covered a lot of ground! Your resume is taking shape in the preview panel. Use the Customize button to tweak the design to your liking.\n\nWhen you're satisfied, click Download PDF to get your finished resume.\n\nAny final additions or changes?`,
-    ]
-    
+  // Special handling for achievements - ask multiple times
+  if (interviewState.phase === 'achievements' && interviewState.achievementCount < 3) {
+    // Stay on achievements for a few more questions
     return {
-      content: completionMessages[Math.floor(Math.random() * completionMessages.length)],
+      content: getPhaseQuestion('achievements', store),
+      hint: 'Add another achievement or say "done" to move on'
+    }
+  }
+  
+  // Move to next phase
+  if (interviewState.phase === 'achievements') {
+    // Save the experience before moving on
+    const exp = interviewState.currentExperience
+    if (exp && exp.achievements.length > 0) {
+      store.addExperience(exp)
+    }
+  }
+  
+  const nextPhase = phaseOrder[currentIndex + 1]
+  interviewState.phase = nextPhase
+  
+  // Check if complete
+  if (nextPhase === 'complete') {
+    return {
+      content: `Excellent! I've built your resume based on our conversation.\n\n✅ **${store.resumeData.contact.name}**\n✅ ${store.resumeData.experience.length} role(s) with achievements\n✅ ${store.resumeData.skills.length} skills\n✅ Education added\n\nCheck out the preview on the right! You can customize colors and fonts using the **Customize** button, then click **Download PDF** when you're ready.`,
       isComplete: true
     }
   }
   
-  // Get question for current topic, avoiding repeats
-  const templates = questionTemplates[interviewState.currentTopic] || questionTemplates.experience
-  const question = getRandomUnused(templates, interviewState.usedQuestions, 'id')
-  interviewState.usedQuestions.push(question.id)
-  
-  // Add transition phrase occasionally (not on first question)
-  let content = question.question(store.resumeData.experience[0] || {})
-  if (interviewState.questionsAsked > 2 && Math.random() > 0.5) {
-    const transition = transitionPhrases[Math.floor(Math.random() * transitionPhrases.length)]
-    content = `${transition} ${content.charAt(0).toLowerCase() + content.slice(1)}`
-  }
-  
   return {
-    content,
-    hint: interviewState.questionsAsked <= 3 ? 'Be specific with numbers and outcomes' : undefined
+    content: getPhaseQuestion(nextPhase, store),
   }
 }
 
@@ -343,8 +378,17 @@ function getNextQuestion(userMessage) {
 export async function processUserMessage(userMessage) {
   const store = useStore.getState()
   
-  // Simulate AI processing delay (varied)
-  await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200))
+  // Check for "done" or "skip" commands in achievements phase
+  if (interviewState.phase === 'achievements') {
+    const lower = userMessage.toLowerCase()
+    if (lower.includes('done') || lower.includes('skip') || lower.includes('next') || lower.includes("that's all") || lower.includes("thats all")) {
+      // Force move to next phase
+      interviewState.achievementCount = 10 // Trigger phase change
+    }
+  }
+  
+  // Simulate AI processing delay
+  await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 800))
   
   // Get next question
   const response = getNextQuestion(userMessage)
@@ -363,21 +407,13 @@ export async function processUserMessage(userMessage) {
   }
 }
 
-// Reset interview state (call when starting new interview)
+// Reset interview state
 export function resetInterviewState() {
   interviewState = {
-    currentTopic: 'experience',
-    experienceIndex: 0,
+    phase: 'name',
     questionsAsked: 0,
-    maxQuestions: 15,
     usedPushbacks: [],
-    usedQuestions: [],
-    lastPushbackIndex: -1,
-    gatheredInfo: {
-      experiences: [],
-      skills: [],
-      education: [],
-      summary: '',
-    }
+    currentExperience: null,
+    achievementCount: 0,
   }
 }

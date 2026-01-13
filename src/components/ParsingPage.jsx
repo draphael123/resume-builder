@@ -62,19 +62,20 @@ function ParsingPage() {
         // Wait a moment then transition
         await new Promise(resolve => setTimeout(resolve, 800))
         
-        // Add initial AI message based on what we found
+        // Add initial AI message - always start with name confirmation
         let initialMessage
         if (parsed.contact.name) {
+          // Pre-populate the name and skip to role question
           initialMessage = {
             role: 'ai',
             type: 'card',
-            content: `Great, ${parsed.contact.name}! I've extracted some information from your resume. Now let's make it really shine.\n\nTo start, tell me about your most recent role. What was your biggest achievement or impact there? Be as specific as possible - numbers and outcomes help a lot.`,
+            content: `I found your name: **${parsed.contact.name}**. Is that correct?\n\nIf yes, tell me about your current or most recent job - what's your title and company?`,
           }
         } else {
           initialMessage = {
             role: 'ai',
             type: 'card',
-            content: `I've processed your resume. Let's build something compelling together.\n\nFirst, let's get the basics right. What is your full name, and what type of role are you targeting with this resume?`,
+            content: `Let's build an impressive resume together! I'll ask you a few questions to gather the key information.\n\n**First, what is your full name?**`,
           }
         }
         
@@ -88,7 +89,7 @@ function ParsingPage() {
         addMessage({
           role: 'ai',
           type: 'card',
-          content: `I had some trouble reading your PDF, but no worries - we can build your resume together from scratch!\n\nLet's start with the basics. What is your full name and what type of role are you targeting?`,
+          content: `I had some trouble reading your PDF, but no worries - we can build your resume together from scratch!\n\n**What is your full name?**`,
         })
         setCurrentStep('interview')
       }
