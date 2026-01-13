@@ -99,12 +99,18 @@ function ParsingPage() {
   }, [])
   
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
-      <div className="max-w-lg w-full">
-        <div className="card p-8">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 bg-gradient-main pattern-grid relative overflow-hidden">
+      {/* Floating shapes */}
+      <div className="floating-shapes" />
+      
+      <div className="relative z-10 max-w-lg w-full">
+        <div className="card p-8 accent-border">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center mb-4 animate-pulse-soft">
-              <FileSearch className="w-8 h-8 text-white" />
+            <div className="relative w-20 h-20 mx-auto mb-6">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 animate-pulse opacity-50 blur-xl" />
+              <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-xl">
+                <FileSearch className="w-10 h-10 text-white" />
+              </div>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               Analyzing Your Resume
@@ -123,19 +129,19 @@ function ParsingPage() {
               return (
                 <div 
                   key={step.id}
-                  className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-300 ${
+                  className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-500 ${
                     isActive 
-                      ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800' 
+                      ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-300 dark:border-blue-700 shadow-lg shadow-blue-500/10' 
                       : isComplete
-                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                        : 'bg-gray-50 dark:bg-dark-surface border border-gray-100 dark:border-dark-border opacity-50'
+                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-800'
+                        : 'bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 opacity-50'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
                     isActive 
-                      ? 'bg-primary-500 text-white' 
+                      ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 scale-110' 
                       : isComplete
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white'
                         : 'bg-gray-200 dark:bg-slate-700 text-gray-400'
                   }`}>
                     {isComplete ? (
@@ -144,11 +150,11 @@ function ParsingPage() {
                       <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse' : ''}`} />
                     )}
                   </div>
-                  <span className={`font-medium ${
+                  <span className={`font-semibold ${
                     isActive 
-                      ? 'text-primary-700 dark:text-primary-300' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent' 
                       : isComplete
-                        ? 'text-green-700 dark:text-green-300'
+                        ? 'text-green-700 dark:text-green-400'
                         : 'text-gray-400'
                   }`}>
                     {step.label}
@@ -160,12 +166,17 @@ function ParsingPage() {
           
           {/* Progress bar */}
           <div className="mt-8">
-            <div className="h-2 bg-gray-100 dark:bg-dark-surface rounded-full overflow-hidden">
+            <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
               <div 
-                className="h-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all duration-500 ease-out"
+                className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 ease-out relative"
                 style={{ width: `${((currentStepIndex + 1) / parsingSteps.length) * 100}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent" />
+              </div>
             </div>
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-3">
+              {Math.round(((currentStepIndex + 1) / parsingSteps.length) * 100)}% complete
+            </p>
           </div>
         </div>
       </div>
