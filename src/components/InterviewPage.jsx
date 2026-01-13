@@ -1,26 +1,43 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import ChatInterface from './ChatInterface'
 import ResumePreview from './ResumePreview'
 import CustomizationPanel from './CustomizationPanel'
-import { Settings, Download, ChevronLeft, ChevronRight } from 'lucide-react'
-import { generatePDF } from '../utils/pdfGenerator'
+import { Settings, Download, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
+import { generatePDF, generatePDFFromData } from '../utils/pdfGenerator'
 
 function InterviewPage() {
-  const { interviewComplete, resumeData } = useStore()
+  const { resumeData, colorScheme, font } = useStore()
   const [showCustomization, setShowCustomization] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
   
   const handleDownload = async () => {
     setIsGeneratingPDF(true)
+    
     try {
-      await generatePDF('resume-preview')
+      // Use the data-based PDF generator (more reliable)
+      generatePDFFromData(resumeData, colorScheme, font)
     } catch (error) {
       console.error('Error generating PDF:', error)
+      
+      // Fallback to html2canvas method
+      try {
+        await generatePDF('resume-preview')
+      } catch (fallbackError) {
+        console.error('Fallback PDF generation also failed:', fallbackError)
+        alert('Could not generate PDF. Please try again.')
+      }
     }
+    
     setIsGeneratingPDF(false)
   }
+  
+  // Check if there's content to download
+  const hasContent = resumeData.contact.name || 
+                     resumeData.summary || 
+                     resumeData.experience.length > 0 || 
+                     resumeData.skills.length > 0
   
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -42,6 +59,7 @@ function InterviewPage() {
           <button
             onClick={() => setPreviewCollapsed(!previewCollapsed)}
             className="btn-secondary !py-2 !px-3 lg:hidden"
+            title={previewCollapsed ? 'Show Preview' : 'Hide Preview'}
           >
             {previewCollapsed ? (
               <ChevronLeft className="w-4 h-4" />
@@ -52,11 +70,21 @@ function InterviewPage() {
           
           <button
             onClick={handleDownload}
-            disabled={isGeneratingPDF}
-            className="btn-primary flex items-center gap-2 !py-2 !px-4"
+            disabled={isGeneratingPDF || !hasContent}
+            className="btn-primary flex items-center gap-2 !py-2 !px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!hasContent ? 'Add content to your resume first' : 'Download PDF'}
           >
-            <Download className={`w-4 h-4 ${isGeneratingPDF ? 'animate-bounce' : ''}`} />
-            <span>{isGeneratingPDF ? 'Generating...' : 'Download PDF'}</span>
+            {isGeneratingPDF ? (
+              <>
+                <FileDown className="w-4 h-4 animate-pulse" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Download PDF</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -95,4 +123,3 @@ function InterviewPage() {
 }
 
 export default InterviewPage
-
